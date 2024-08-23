@@ -35,20 +35,24 @@ const int cmPokaz           = 202;
 const int cmUsunTowar       = 203;
 const int cmEdytujTowar     = 204;
 const int cmPrzeterminowane = 205;
+const int cmOProgramie      = 206;
 
 short nrOkna                = 0;
 short nrOknaPrzeterminowane = 0;
 
-struct TTowar {
+struct TTowar
+{
     std::string nr, nazwa, cena, ilosc, data, wartosc;
 };
 
-class TOkno : public TWindow {
+class TOkno : public TWindow
+{
     public:
         TOkno(const TRect& bounds, const char *title, short number, std::vector<std::string> linie);
 };
 
-class TWnetrze : public TScroller {
+class TWnetrze : public TScroller
+{
     private:
         std::vector<std::string> m_Linie;
     public:
@@ -56,14 +60,16 @@ class TWnetrze : public TScroller {
         virtual void draw();
 };
 
-TWnetrze::TWnetrze(const TRect& bounds, TScrollBar *HScrollbar, TScrollBar *VScrollbar, std::vector<std::string> linie) : TScroller(bounds, HScrollbar, VScrollbar) {
+TWnetrze::TWnetrze(const TRect& bounds, TScrollBar *HScrollbar, TScrollBar *VScrollbar, std::vector<std::string> linie) : TScroller(bounds, HScrollbar, VScrollbar)
+{
     this->m_Linie = linie;
     growMode = gfGrowHiX | gfGrowHiY;
     options = options | ofFramed;
     setLimit(linie.at(1).length(), linie.size());
 }
 
-void TWnetrze::draw() {
+void TWnetrze::draw()
+{
     ushort kolor = getColor(0x0301);
     for (int i = 0; i < size.y; ++i) {
         TDrawBuffer b;
@@ -76,7 +82,8 @@ void TWnetrze::draw() {
 }
 
 
-TOkno::TOkno(const TRect& bounds, const char *title, short number, std::vector<std::string> linie) : TWindow(bounds, title, number), TWindowInit(&TOkno::initFrame) {
+TOkno::TOkno(const TRect& bounds, const char *title, short number, std::vector<std::string> linie) : TWindow(bounds, title, number), TWindowInit(&TOkno::initFrame)
+{
     TScrollBar *vScrollbar = standardScrollBar(sbVertical | sbHandleKeyboard);
     TScrollBar *hScrollbar = standardScrollBar(sbHorizontal | sbHandleKeyboard);
     TRect r = getClipRect();
@@ -98,6 +105,7 @@ private:
     void usunTowar();
     void edytujTowar();
     void przeterminowane();
+    void oProgramie();
     std::string dialogSortowania(bool przeterminowanie);
 };
 
@@ -134,6 +142,10 @@ void TMagazynApp::handleEvent(TEvent& event)
         przeterminowane();
         clearEvent(event);
         break;
+    case cmOProgramie:
+        oProgramie();
+        clearEvent(event);
+        break;
     default: break;
     }
 }
@@ -150,7 +162,9 @@ TMenuBar *TMagazynApp::initMenuBar(TRect r)
         *new TSubMenu("~T~owar", kbAltT) +
             *new TMenuItem("~N~owy...", cmNowyTowar, kbF3, hcNoContext, "F3") +
             *new TMenuItem("~E~dytuj...", cmEdytujTowar, kbF4, hcNoContext, "F4") +
-            *new TMenuItem("~U~suń...", cmUsunTowar, kbF5, hcNoContext, "F5")
+            *new TMenuItem("~U~suń...", cmUsunTowar, kbF5, hcNoContext, "F5") + 
+        *new TSubMenu("~I~nne", kbAltI) +
+            *new TMenuItem("~O~ programie...", cmOProgramie, kbAltO)
     );
 }
 
@@ -516,6 +530,17 @@ void TMagazynApp::usunTowar() {
         sqlite3_step(polecenie);
         sqlite3_finalize(polecenie);
     }
+}
+
+void TMagazynApp::oProgramie()
+{
+    TDialog *d = new TDialog(TRect(4, 4, 55, 10), "O programie");
+    d->insert(new TStaticText(TRect(2, 1, 32, 2), "..:: Magazyn wersja 2.1 ::.."));
+    d->insert(new TStaticText(TRect(2, 2, 32, 3), "2024 Konrad Goliński"));
+    d->insert(new TStaticText(TRect(2, 3, 36, 4), "Używa: Borland Turbo Vision 2.0"));
+    d->insert(new TStaticText(TRect(2, 4, 50, 5), "Kocham informatykę (Miłosz i Mikołaj nie)"));
+    deskTop->execView(d);
+    destroy(d);
 }
 
 int main()
