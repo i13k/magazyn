@@ -98,6 +98,7 @@ private:
     void usunTowar();
     void edytujTowar();
     void przeterminowane();
+    std::string dialogSortowania(bool przeterminowanie);
 };
 
 TMagazynApp::TMagazynApp() :
@@ -305,7 +306,16 @@ void TMagazynApp::edytujTowar()
         sqlite3_finalize(polecenie);
     }
 }
-std::vector<std::string> generujLinie(std::string sql = "SELECT rowid, nazwa, cena, ilosc, data FROM magazyn;")
+std::string double_na_string(double x) 
+{
+    std::ostringstream o;
+    o << std::setprecision(2)
+      << std::fixed
+      << x;
+    return o.str();
+}
+
+std::vector<std::string> generujLinie(std::string sql)
 {
         
     sqlite3_stmt *polecenie;
@@ -316,33 +326,40 @@ std::vector<std::string> generujLinie(std::string sql = "SELECT rowid, nazwa, ce
     
     unsigned ileTowarow = 0;
     unsigned maxNr = 0, maxNazwa = 0, maxCena = 0, maxIlosc = 0, maxWartosc = 0;
+    double lacznaWartosc = 0;
     
     while (sqlite3_step(polecenie) != SQLITE_DONE) {
         TTowar towar;
+        
         towar.nr = std::to_string(sqlite3_column_int(polecenie, 0));
+        
         towar.nazwa = std::string(reinterpret_cast<const char*>(sqlite3_column_text(polecenie, 1)));
-        double cena = sqlite3_column_double(polecenie, 2);
-        std::ostringstream o; o << std::setprecision(2) << std::fixed << cena;
-        towar.cena = o.str();
+        
+        towar.cena = double_na_string(sqlite3_column_double(polecenie, 2));
+        
         towar.ilosc = std::to_string(sqlite3_column_int(polecenie, 3));
+        
         towar.data = std::string(reinterpret_cast<const char*>(sqlite3_column_text(polecenie, 4)));
-        std::ostringstream o2; o2 << std::setprecision(2) << std::fixed << std::stod(towar.cena) * std::stoi(towar.ilosc);
-        towar.wartosc = o2.str();
-        towary.push_back(towar);
+        
+        double wartosc = sqlite3_column_double(polecenie, 5);
+        towar.wartosc = double_na_string(wartosc);;
+        
+        lacznaWartosc += wartosc;
         ++ileTowarow;
-    }
-    /*
-       nr | nazwa    | cena   | ilosc   | wartosc |data      
-       ---------------------------------------------
-       1  | drops    | 3.20   | 3       | 9.60    | 2024-10-23
-    */
-    for (const TTowar towar : towary) {
+        
+        towary.push_back(towar);
+        
         if (maxNr < towar.nr.length()) maxNr = towar.nr.length();
         if (maxNazwa < towar.nazwa.length()) maxNazwa = towar.nazwa.length();
         if (maxCena < towar.cena.length()) maxCena = towar.cena.length();
         if (maxIlosc < towar.ilosc.length()) maxIlosc = towar.ilosc.length();
         if (maxWartosc < towar.wartosc.length()) maxWartosc = towar.wartosc.length();
     }
+    /*
+       nr | nazwa    | cena   | ilosc   | wartosc |data      
+       ---------------------------------------------
+       1  | drops    | 3.20   | 3       | 9.60    | 2024-10-23
+    */
     
     std::string naglowek("");
     
@@ -373,7 +390,6 @@ std::vector<std::string> generujLinie(std::string sql = "SELECT rowid, nazwa, ce
     
     linie.push_back(naglowek); linie.push_back(kreski);
     
-    double lacznaWartosc = 0;
     for (const TTowar towar : towary) {
         std::string linia("");
         
@@ -399,50 +415,73 @@ std::vector<std::string> generujLinie(std::string sql = "SELECT rowid, nazwa, ce
         
         linia += towar.data;
         
-        lacznaWartosc += std::stod(towar.wartosc);
-        
         linie.push_back(linia);
     }
-    std::ostringstream o; o << std::setprecision(2) << std::fixed << "Łączna wartość: " << lacznaWartosc;
-    linie.push_back(o.str());
+    linie.push_back("Ilość towarów: " + std::to_string(ileTowarow));
+    linie.push_back("Łączna wartość: " + double_na_string(lacznaWartosc));
     return linie;
 }
 
-void TMagazynApp::pokazMagazyn() {
-    TDialog *d = new TDialog(TRect(3, 3, 40, 15), "Sortowanie");
+std::string TMagazynApp::dialogSortowania(bool przeterminowanie)
+{
+    struct {
+        ushort cecha = 0, kolejnosc = 0;
+    } opcje;
+    TDialog *d = new TDialog(TRect(3, 3, 40, 16), "Sortowanie");
     
     d->insert(new TStaticText(TRect(2, 2, 14, 3), "sortuj wg.:"));
-    d->insert(new TRadioButtons(TRect(2, 3, 14, 8),
+    d->insert(new TRadioButtons(TRect(2, 3, 14, 9),
     new TSItem("~N~umeru",
     new TSItem("N~a~zwy",
     new TSItem("~C~eny",
     new TSItem("~I~lości",
-    new TSItem("~D~aty", 0))))) ) );
+    new TSItem("~D~aty", 
+    new TSItem("~W~artości", 0)))))) ) );
     
     d->insert(new TStaticText(TRect(15, 2, 29, 3), "jak sortować?"));
     d->insert(new TRadioButtons(TRect(15, 3, 29, 5),
-    new TSItem("~M~alejąco",
-    new TSItem("~R~osnąco", 0)) ) );
+    new TSItem("~R~osnąco",
+    new TSItem("~M~alejąco", 0)) ) );
     
-    d->insert(new TButton(TRect(13, 9, 23, 11), "~S~ortuj", cmOK, bfDefault));
-    d->insert(new TButton(TRect(24, 9, 34, 11), "An~u~luj", cmCancel, bfNormal));
+    d->insert(new TButton(TRect(13, 10, 23, 12), "~S~ortuj", cmOK, bfDefault));
+    d->insert(new TButton(TRect(24, 10, 34, 12), "An~u~luj", cmCancel, bfNormal));
+    
+    d->setData(&opcje);
     
     ushort wynik = deskTop->execView(d);
+    if (wynik == cmCancel) { destroy(d); return ""; }
+    
+    d->getData(&opcje);
     destroy(d);
     
-    if (wynik != cmCancel) {
-        std::vector<std::string> linie = generujLinie();
+    std::string sql("SELECT rowid, nazwa, cena, ilosc, data, cena * ilosc AS wartosc FROM magazyn ");
+    if (przeterminowanie) sql += "WHERE data < date() ";
+    sql += "ORDER BY ";
+    sql += (const std::string[]){"rowid","nazwa","cena","ilosc","data","wartosc"}[opcje.cecha] + " ";
+    sql += (const std::string[]){"ASC","DESC"}[opcje.kolejnosc] + ";";
+    
+    return sql;
+}
+void TMagazynApp::pokazMagazyn()
+{
+    std::string sql = dialogSortowania(false);
+    if (sql != "") {
+        std::vector<std::string> linie = generujLinie(sql);
         TRect r(1, 1, linie.at(1).length() + 4, 12);
         TOkno *okno = new TOkno(r, "Lista towarów", ++nrOkna, linie);
         deskTop->insert(okno);
     }
 }
 
-void TMagazynApp::przeterminowane() {
-    std::vector<std::string> linie = generujLinie("SELECT rowid, nazwa, cena, ilosc, data FROM magazyn WHERE data < date();");
-    TRect r(1, 1, linie.at(1).length() + 4, 12);
-    TOkno *okno = new TOkno(r, "Towary przeterminowane", ++nrOknaPrzeterminowane, linie);
-    deskTop->insert(okno);
+void TMagazynApp::przeterminowane()
+{
+    std::string sql = dialogSortowania(true);
+    if (sql != "") {
+        std::vector<std::string> linie = generujLinie(sql);
+        TRect r(1, 1, linie.at(1).length() + 4, 12);
+        TOkno *okno = new TOkno(r, "Towary przeterminowane", ++nrOknaPrzeterminowane, linie);
+        deskTop->insert(okno);
+    }
 }
 
 void TMagazynApp::usunTowar() {
